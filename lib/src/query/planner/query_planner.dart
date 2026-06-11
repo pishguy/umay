@@ -1,6 +1,5 @@
 import '../filter.dart';
 import '../../index/index_manager.dart';
-import '../../index/compound_index.dart';
 import 'query_plan.dart';
 
 class QueryPlanner {

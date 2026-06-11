@@ -1,4 +1,4 @@
-import '../../umay_db.dart';
+import '../core/umay_box.dart';
 import 'change_event.dart';
 
 extension KeyWatch on UmayBox {

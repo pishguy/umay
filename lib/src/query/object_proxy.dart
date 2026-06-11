@@ -1,9 +1,5 @@
 import 'expressions.dart';
 
-T _makeProxy<T>(FieldExpr Function(String) getField) {
-  return _Proxy<T>(getField) as T;
-}
-
 class _Proxy<T> extends Object {
   final FieldExpr Function(String) getField;
 
