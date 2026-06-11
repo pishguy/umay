@@ -1,0 +1,10 @@
+name: umay_db
+description: A lightweight embedded NoSQL database for Dart and Flutter.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+
+dev_dependencies:
+  lints: ^5.0.0
