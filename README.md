@@ -52,9 +52,7 @@ UmayDB is a lightweight embedded NoSQL database for Dart and Flutter, inspired b
 
 ```yaml
 dependencies:
-  umay_db:
-    git:
-      url: https://github.com/pishguy/umay.git
+  umay_db: ^1.0.1
 ```
 
 ### Basic usage

@@ -52,9 +52,7 @@
 
 ```yaml
 dependencies:
-  umay_db:
-    git:
-      url: https://github.com/pishguy/umay.git
+  umay_db: ^1.0.1
 ```
 
 ### Əsas istifadə
