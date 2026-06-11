@@ -1,4 +1,15 @@
-## 1.0.0
+## 1.0.2
+
+- Rename logo image to logo.png
+- Update install instructions to pub.dev package
+- Add Persian and Azerbaijani README
+
+## 1.0.1
+
+- Initial pub.dev release
+- Add CHANGELOG.md
+- Add LICENSE
+- Prepare package metadata for publishing
 
 - Initial release
 - Active Record ORM with fillable, guarded, hidden, casts, accessors, mutators
