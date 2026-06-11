@@ -1,16 +1,3 @@
-<table>
-<tr>
-<td width="50%"><img src="https://raw.githubusercontent.com/pishguy/umay/main/6c708cc6-73a1-42a2-a557-f2a2478bbd0b.png" width="300" alt="UmayDB"></td>
-<td width="50%" valign="middle">
-
-## UmayDB
-
-یک دیتابیس NoSQL جاسازی‌شده، سبک و قدرتمند برای **Flutter** و **Dart**، با الهام از **Laravel Eloquent** و معماری **Bitcask**.
-
-</td>
-</tr>
-</table>
-
 <div align="center">
   <a href="README.md">English</a> | <strong>فارسی</strong> | <a href="README.az.md">Azərbaycanca</a>
 </div>

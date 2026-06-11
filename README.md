@@ -1,15 +1,6 @@
-<table>
-<tr>
-<td width="50%"><img src="https://raw.githubusercontent.com/pishguy/umay/main/6c708cc6-73a1-42a2-a557-f2a2478bbd0b.png" width="300" alt="UmayDB"></td>
-<td width="50%" valign="middle">
-
 ## UmayDB
 
 UmayDB is a lightweight embedded NoSQL database for Dart and Flutter, inspired by Laravel Eloquent ORM and Bitcask storage architecture.
-
-</td>
-</tr>
-</table>
 
 <div align="center">
   <strong>English</strong> | <a href="README.fa.md">فارسی</a> | <a href="README.az.md">Azərbaycanca</a>
