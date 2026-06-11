@@ -1,12 +1,6 @@
-![UmayDB](6c708cc6-73a1-42a2-a557-f2a2478bbd0b.png)
+<img src="6c708cc6-73a1-42a2-a557-f2a2478bbd0b.png" width="400" alt="UmayDB">
 
 # UmayDB
-
-<div dir="rtl">
-
-یک دیتابیس NoSQL جاسازی‌شده، سبک و قدرتمند برای **Flutter** و **Dart**، با الهام از **Laravel Eloquent** و معماری **Bitcask**.
-
-</div>
 
 ---
 
