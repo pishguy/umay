@@ -1,3 +1,16 @@
+<table>
+<tr>
+<td width="50%"><img src="https://raw.githubusercontent.com/pishguy/umay/main/6c708cc6-73a1-42a2-a557-f2a2478bbd0b.png" width="300" alt="UmayDB"></td>
+<td width="50%" valign="middle">
+
+## UmayDB
+
+**UmayDB** — Dart və Flutter üçün yüngül, quraşdırılmış NoSQL verilənlər bazasıdır. **Laravel Eloquent** ORM və **Bitcask** saxlama arxitekturasından ilhamlanmışdır.
+
+</td>
+</tr>
+</table>
+
 <div align="center">
   <a href="README.md">English</a> | <a href="README.fa.md">فارسی</a> | <strong>Azərbaycanca</strong>
 </div>
