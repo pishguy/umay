@@ -1,3 +1,7 @@
+## 1.1.3
+
+- Update version in READMEs to ^1.1.2
+
 ## 1.1.2
 
 - Update version in READMEs to ^1.1.1
