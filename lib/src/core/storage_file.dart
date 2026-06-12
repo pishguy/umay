@@ -54,6 +54,29 @@ class StorageFile {
     return offset;
   }
 
+  Future<List<int>> appendAll(List<Uint8List> chunks) async {
+    final wraf = _writeRaf;
+    if (wraf == null) throw StateError('StorageFile is not open');
+
+    final offsets = <int>[];
+    final builder = BytesBuilder(copy: false);
+    var nextOffset = _writePosition;
+
+    for (final chunk in chunks) {
+      offsets.add(nextOffset);
+      builder.add(chunk);
+      nextOffset += chunk.length;
+    }
+
+    final bytes = builder.takeBytes();
+    if (bytes.isNotEmpty) {
+      await wraf.writeFrom(bytes);
+      _writePosition = nextOffset;
+    }
+
+    return offsets;
+  }
+
   /// Reads exactly [length] bytes starting at [offset].
   Future<Uint8List> readAt(int offset, int length) async {
     final rraf = _readRaf;

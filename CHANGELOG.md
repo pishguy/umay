@@ -1,3 +1,15 @@
+## 1.1.0
+
+- Batch write optimization: `batchPut` and `batchDelete` now batch all disk and hint writes via `StorageFile.appendAll()`
+- Cached DB size metrics (`_dbDataSize`, `_liveDataSize`) for O(1) compaction decisions instead of file scanning
+- Record length tracking (`_recordLengths` map) to avoid header re-reads during updates/deletes
+- Configurable snapshot write interval (`_snapshotWriteInterval` = 100K ops)
+- `hasIndexes` getter on `IndexManager`, `hasListeners` getter on `ChangeBus` for efficient old-value skipping
+- `StorageFile.appendAll()` for single-disk-write batch appending
+- Add benchmark tool (`bin/benchmark.dart`) with create/update/delete cases
+- Add test suite (`test/umay_box_test.dart`) covering recovery, batch consistency, and update semantics
+- Add `test` dev dependency
+
 ## 1.0.2
 
 - Rename logo image to logo.png

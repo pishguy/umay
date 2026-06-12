@@ -9,6 +9,8 @@ class ChangeBus {
     _controller.add(event);
   }
 
+  bool get hasListeners => _controller.hasListener;
+
   Stream<ChangeEvent> get stream => _controller.stream;
 
   void close() {

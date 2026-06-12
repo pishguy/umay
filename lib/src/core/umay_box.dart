@@ -20,6 +20,8 @@ import 'record_codec.dart';
 import 'storage_file.dart';
 
 class UmayBox {
+  static const int _snapshotWriteInterval = 100000;
+
   final String name;
   final String _directory;
 
@@ -41,6 +43,9 @@ class UmayBox {
   bool _isOpen = false;
   int _snapshotCounter = 0;
   bool _snapshotDirty = false;
+  final Map<String, int> _recordLengths = {};
+  int _dbDataSize = 0;
+  int _liveDataSize = 0;
   Timer? _backgroundCompactionTimer;
 
   UmayBox._(this.name, this._directory);
@@ -63,6 +68,8 @@ class UmayBox {
     for (final entry in recovered.entries) {
       box._index.add(entry.key, entry.value);
     }
+    box._dbDataSize = await box._file.length();
+    box._liveDataSize = await box._rebuildRecordLengthMetrics();
 
     box.queryEngine = QueryEngine(box, box.indexManager);
     box._isOpen = true;
@@ -249,6 +256,38 @@ class UmayBox {
     return Serializer.deserialize(valueBytes);
   }
 
+  Future<int> _readRecordLengthAt(int offset) async {
+    final headerBytes =
+    await _file.readAt(offset, RecordCodec.headerSize);
+    final header = RecordCodec.decodeHeader(headerBytes);
+    return header.totalLength;
+  }
+
+  Future<int> _rebuildRecordLengthMetrics() async {
+    var liveSize = 0;
+    _recordLengths.clear();
+
+    for (final entry in _index.offsets.entries) {
+      try {
+        final length = await _readRecordLengthAt(entry.value);
+        _recordLengths[entry.key] = length;
+        liveSize += length;
+      } catch (_) {}
+    }
+
+    return liveSize;
+  }
+
+  Future<int> _oldRecordLength(String key, int? oldOffset) async {
+    final length = _recordLengths[key];
+    if (length != null) return length;
+    if (oldOffset == null) return 0;
+    return _readRecordLengthAt(oldOffset);
+  }
+
+  bool get _needsOldValueForPut =>
+      indexManager.hasIndexes || _bus.hasListeners;
+
   // =============================================================
   // GET
   //
@@ -274,7 +313,10 @@ class UmayBox {
     _ensureOpen();
 
     return _writeLock.run(() async {
-      final oldValue = await get(key);
+      final oldOffset = _index[key];
+      final oldValue = oldOffset == null ? null : await _readValueAt(oldOffset);
+      final oldRecordLength =
+          oldOffset == null ? 0 : await _readRecordLengthAt(oldOffset);
 
       final resolvedTypeId =
           typeId ?? TypeRegistry.findTypeIdFor(value) ?? 0;
@@ -289,11 +331,13 @@ class UmayBox {
       final offset = await _file.append(record);
 
       _index.add(key, offset);
+      _dbDataSize += record.length;
+      _liveDataSize += record.length - oldRecordLength;
 
       await _hintFile.append(HintCodec.encode(key, offset));
 
       _snapshotDirty = true;
-      if (_snapshotCounter++ >= 5000) {
+      if (_snapshotCounter++ >= _snapshotWriteInterval) {
         await IndexSnapshot.save(_snapshotFile.path, _index.offsets);
         _snapshotCounter = 0;
       }
@@ -316,11 +360,18 @@ class UmayBox {
     _ensureOpen();
 
     return _writeLock.run(() async {
+      final prepared = <_PreparedPut>[];
+      final records = <Uint8List>[];
+
       for (final entry in entries) {
         final key = entry.key;
         final value = entry.value;
 
-        final oldValue = _index.containsKey(key) ? await get(key) : null;
+        final oldOffset = _index[key];
+        final oldValue =
+            oldOffset == null ? null : await _readValueAt(oldOffset);
+        final oldRecordLength =
+            oldOffset == null ? 0 : await _readRecordLengthAt(oldOffset);
 
         final resolvedTypeId =
             TypeRegistry.findTypeIdFor(value) ?? 0;
@@ -332,27 +383,48 @@ class UmayBox {
           value: encodedValue,
         );
 
-        final offset = await _file.append(record);
-        _index.add(key, offset);
-
-        final hintEntry = HintCodec.encode(key, offset);
-        await _hintFile.append(hintEntry);
-
-        final oldMap = _asMap(oldValue);
-        final newMap = _asMap(value);
-        if (oldMap != null) indexManager.onDelete(oldMap, key);
-        if (newMap != null) indexManager.onPut(newMap, key);
+        prepared.add(_PreparedPut(
+          key: key,
+          value: value,
+          oldValue: oldValue,
+          oldRecordLength: oldRecordLength,
+          recordLength: record.length,
+        ));
+        records.add(record);
       }
+
+      final offsets = await _file.appendAll(records);
+      final hintEntries = <Uint8List>[];
+
+      for (var i = 0; i < prepared.length; i++) {
+        final item = prepared[i];
+        final offset = offsets[i];
+
+        _index.add(item.key, offset);
+        _dbDataSize += item.recordLength;
+        _liveDataSize += item.recordLength - item.oldRecordLength;
+
+        hintEntries.add(HintCodec.encode(item.key, offset));
+
+        final oldMap = _asMap(item.oldValue);
+        final value = item.value;
+        final newMap = _asMap(value);
+        if (oldMap != null) indexManager.onDelete(oldMap, item.key);
+        if (newMap != null) indexManager.onPut(newMap, item.key);
+      }
+
+      await _hintFile.appendAll(hintEntries);
 
       _snapshotDirty = true;
 
-      for (final entry in entries) {
+      for (final item in prepared) {
         _bus.emit(ChangeEvent(
-          key: entry.key, type: ChangeType.put,
-          oldValue: null, newValue: entry.value,
+          key: item.key, type: ChangeType.put,
+          oldValue: item.oldValue, newValue: item.value,
         ));
       }
       queryEngine.invalidateAll();
+      await _maybeCompact();
     });
   }
 
@@ -399,6 +471,9 @@ class UmayBox {
     _ensureOpen();
 
     return _writeLock.run(() async {
+      final physicalDeletes = <_PreparedDelete>[];
+      final records = <Uint8List>[];
+
       for (final key in keys) {
         final obj = await get(key);
         if (obj == null) continue;
@@ -420,34 +495,62 @@ class UmayBox {
           continue;
         }
 
+        final oldOffset = _index[key];
+        final oldRecordLength =
+            oldOffset == null ? 0 : await _readRecordLengthAt(oldOffset);
+
         final record = RecordCodec.encode(
           deleted: true,
           key: Uint8List.fromList(key.codeUnits),
           value: Uint8List(0),
         );
-        final offset = await _file.append(record);
-        _index.remove(key);
 
-        final hintEntry = HintCodec.encode(key, offset);
-        await _hintFile.append(hintEntry);
+        physicalDeletes.add(_PreparedDelete(
+          key: key,
+          oldValue: obj,
+          oldRecordLength: oldRecordLength,
+          recordLength: record.length,
+        ));
+        records.add(record);
+      }
 
-        final oldMap = _asMap(obj);
-        if (oldMap != null) indexManager.onDelete(oldMap, key);
+      final offsets = await _file.appendAll(records);
+      final hintEntries = <Uint8List>[];
+
+      for (var i = 0; i < physicalDeletes.length; i++) {
+        final item = physicalDeletes[i];
+        final offset = offsets[i];
+
+        _index.remove(item.key);
+        _dbDataSize += item.recordLength;
+        _liveDataSize -= item.oldRecordLength;
+        if (_liveDataSize < 0) _liveDataSize = 0;
+
+        hintEntries.add(HintCodec.encode(item.key, offset));
+
+        final oldMap = _asMap(item.oldValue);
+        if (oldMap != null) indexManager.onDelete(oldMap, item.key);
 
         _bus.emit(ChangeEvent(
-          key: key, type: ChangeType.delete,
-          oldValue: obj, newValue: null,
+          key: item.key, type: ChangeType.delete,
+          oldValue: item.oldValue, newValue: null,
         ));
       }
 
+      await _hintFile.appendAll(hintEntries);
+
       _snapshotDirty = true;
       queryEngine.invalidateAll();
+      await _maybeCompact();
     });
   }
 
   Future<void> _putInternal(String key, Object value,
       [int? typeId]) async {
-    final oldValue = await get(key);
+    final oldOffset = _index[key];
+    final oldValue = oldOffset == null ? null : await _readValueAt(oldOffset);
+    final oldRecordLength =
+        oldOffset == null ? 0 : await _readRecordLengthAt(oldOffset);
 
     final resolvedTypeId =
         typeId ?? TypeRegistry.findTypeIdFor(value) ?? 0;
@@ -462,12 +565,14 @@ class UmayBox {
     final offset = await _file.append(record);
 
     _index.add(key, offset);
+    _dbDataSize += record.length;
+    _liveDataSize += record.length - oldRecordLength;
 
     final hintEntry = HintCodec.encode(key, offset);
     await _hintFile.append(hintEntry);
 
     _snapshotDirty = true;
-    if (_snapshotCounter++ >= 5000) {
+    if (_snapshotCounter++ >= _snapshotWriteInterval) {
       await IndexSnapshot.save(_snapshotFile.path, _index.offsets);
       _snapshotCounter = 0;
     }
@@ -491,6 +596,10 @@ class UmayBox {
   /// Physical delete — tombstone رو append می‌کنه.
   /// فقط از داخل _writeLock.run() صدا زده میشه.
   Future<void> _deletePhysical(String key, dynamic oldValue) async {
+    final oldOffset = _index[key];
+    final oldRecordLength =
+        oldOffset == null ? 0 : await _readRecordLengthAt(oldOffset);
+
     final record = RecordCodec.encode(
       deleted: true,
       key: Uint8List.fromList(key.codeUnits),
@@ -500,13 +609,20 @@ class UmayBox {
     final offset = await _file.append(record);
 
     _index.remove(key);
+    _dbDataSize += record.length;
+    _liveDataSize -= oldRecordLength;
+    if (_liveDataSize < 0) _liveDataSize = 0;
 
     // Hint entry برای tombstone هم ثبت میشه
     // تا در recovery بفهمیم key حذف شده
     final hintEntry = HintCodec.encode(key, offset);
     await _hintFile.append(hintEntry);
 
-    await IndexSnapshot.save(_snapshotFile.path, _index.offsets);
+    _snapshotDirty = true;
+    if (_snapshotCounter++ >= _snapshotWriteInterval) {
+      await IndexSnapshot.save(_snapshotFile.path, _index.offsets);
+      _snapshotCounter = 0;
+    }
 
     // Secondary indexes
     final oldMap = _asMap(oldValue);
@@ -583,6 +699,8 @@ class UmayBox {
       await _reopenFiles();
       _index.clear();
       newIndex.forEach(_index.add);
+      _dbDataSize = await _file.length();
+      _liveDataSize = await _calculateLiveDataSize();
 
       queryEngine.invalidateAll();
     });
@@ -591,21 +709,7 @@ class UmayBox {
   /// بررسی می‌کنه آیا compaction لازمه یا نه.
   /// اگه garbage ratio از threshold بیشتر بود، compact رو صدا می‌زنه.
   Future<void> _maybeCompact() async {
-    final dbSize = await _file.length();
-
-    int liveSize = 0;
-    for (final offset in _index.offsets.values) {
-      try {
-        final headerBytes =
-        await _file.readAt(offset, RecordCodec.headerSize);
-        final header = RecordCodec.decodeHeader(headerBytes);
-        liveSize += header.totalLength;
-      } catch (_) {
-        // اگه header خراب بود، skip کن
-      }
-    }
-
-    if (await _policy.shouldCompact(dbSize, liveSize)) {
+    if (await _policy.shouldCompact(_dbDataSize, _liveDataSize)) {
       // ✅ نکته: اینجا compact() رو بدون lock صدا نزن!
       //          compact() خودش lock می‌گیره.
       //          ولی _maybeCompact از داخل put() صدا زده میشه
@@ -628,6 +732,8 @@ class UmayBox {
 
     _index.clear();
     newIndex.forEach(_index.add);
+    _dbDataSize = await _file.length();
+    _liveDataSize = await _calculateLiveDataSize();
 
     queryEngine.invalidateAll();
   }
@@ -639,19 +745,7 @@ class UmayBox {
           try {
             //background compaction هم باید lock بگیره
             await _writeLock.run(() async {
-              final dbSize = await _file.length();
-
-              int liveSize = 0;
-              for (final offset in _index.offsets.values) {
-                try {
-                  final headerBytes =
-                  await _file.readAt(offset, RecordCodec.headerSize);
-                  final header = RecordCodec.decodeHeader(headerBytes);
-                  liveSize += header.totalLength;
-                } catch (_) {}
-              }
-
-              if (await _policy.shouldCompact(dbSize, liveSize)) {
+              if (await _policy.shouldCompact(_dbDataSize, _liveDataSize)) {
                 await _compactInternal();
               }
             });
@@ -740,4 +834,34 @@ class UmayBox {
 
     return null;
   }
+}
+
+class _PreparedPut {
+  final String key;
+  final Object value;
+  final dynamic oldValue;
+  final int oldRecordLength;
+  final int recordLength;
+
+  const _PreparedPut({
+    required this.key,
+    required this.value,
+    required this.oldValue,
+    required this.oldRecordLength,
+    required this.recordLength,
+  });
+}
+
+class _PreparedDelete {
+  final String key;
+  final dynamic oldValue;
+  final int oldRecordLength;
+  final int recordLength;
+
+  const _PreparedDelete({
+    required this.key,
+    required this.oldValue,
+    required this.oldRecordLength,
+    required this.recordLength,
+  });
 }

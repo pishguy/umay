@@ -10,6 +10,13 @@ class IndexManager {
   final Map<String, FuzzyIndex<String>> fuzzyIndexes = {};
   final List<CompoundIndex> compositeIndexes = [];
 
+  bool get hasIndexes =>
+      secondaryIndexes.isNotEmpty ||
+      compoundIndexes.isNotEmpty ||
+      uniqueIndexes.isNotEmpty ||
+      fuzzyIndexes.isNotEmpty ||
+      compositeIndexes.isNotEmpty;
+
   // CREATE INDEXES
 
   void createIndex(String field) {
