@@ -700,7 +700,7 @@ class UmayBox {
       _index.clear();
       newIndex.forEach(_index.add);
       _dbDataSize = await _file.length();
-      _liveDataSize = await _calculateLiveDataSize();
+      _liveDataSize = await _rebuildRecordLengthMetrics();
 
       queryEngine.invalidateAll();
     });
@@ -733,7 +733,7 @@ class UmayBox {
     _index.clear();
     newIndex.forEach(_index.add);
     _dbDataSize = await _file.length();
-    _liveDataSize = await _calculateLiveDataSize();
+    _liveDataSize = await _rebuildRecordLengthMetrics();
 
     queryEngine.invalidateAll();
   }

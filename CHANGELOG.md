@@ -1,3 +1,7 @@
+## 1.1.1
+
+- Fix undefined `_calculateLiveDataSize` method — replaced with `_rebuildRecordLengthMetrics`
+
 ## 1.1.0
 
 - Batch write optimization: `batchPut` and `batchDelete` now batch all disk and hint writes via `StorageFile.appendAll()`
