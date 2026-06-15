@@ -1,3 +1,14 @@
+## 1.2.0
+
+- Add comprehensive dartdoc comments across all public API elements (20%+ threshold met)
+- Add example file (`example/umay_db_example.dart`) demonstrating CRUD and query builder
+- Fix all static analysis warnings and infos (0 issues on `dart analyze`)
+- Remove unused declarations: `_oldRecordLength`, `_needsOldValueForPut` in `umay_box.dart`
+- Remove unused import, parameter, file: `type_adapter.dart` import, `_key` method, `object_proxy.dart`
+- Fix unintended HTML in doc comments, parameter naming, unnecessary null assertions
+- Clean up unnecessary imports in `umay_model.dart`, `umay_model_relations.dart`, `query_engine.dart`, `linq_query_builder.dart`, `many_to_many.dart`
+- Use super parameters in relation classes (`BelongsTo`, `HasMany`, `HasOne`, `ManyToMany`)
+
 ## 1.1.3
 
 - Update version in READMEs to ^1.1.2

@@ -25,8 +25,8 @@ class CompositeKey implements Comparable<CompositeKey> {
   }
 
   @override
-  bool operator ==(Object o) =>
-      o is CompositeKey && _equals(o.parts);
+  bool operator ==(Object other) =>
+      other is CompositeKey && _equals(other.parts);
 
   bool _equals(List<dynamic> other) {
     if (other.length != parts.length) return false;

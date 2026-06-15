@@ -69,7 +69,7 @@ class ReadWriteLock {
     } finally {
       _writing = false;
       // اول همه reader ها رو آزاد کن
-      for (final c in List.of(_readQueue)) c.complete();
+      for (final c in List.of(_readQueue)) { c.complete(); }
       _readQueue.clear();
       // بعد یه writer بعدی
       _notifyNextWriter();

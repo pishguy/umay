@@ -1,9 +1,17 @@
+/// A trigram-based fuzzy index for approximate string matching.
+///
+/// Breaks indexed text into 3-character trigrams and scores candidates
+/// by the number of shared trigrams with the query.
 class FuzzyIndex<K> {
   final Map<String, Set<K>> _trigrams = {};
 
+  /// Returns the number of unique trigrams currently stored (debug only).
   int debugTrigramCount() => _trigrams.length;
+
+  /// Returns a snapshot of the internal trigram map (debug only).
   Map<String, Set<K>> debugTrigrams() => Map.from(_trigrams);
 
+  /// Indexes [text] by its trigrams, associating it with [key].
   void add(String text, K key) {
     var grams = _generateTrigrams(text);
     for (var gram in grams) {
@@ -11,6 +19,7 @@ class FuzzyIndex<K> {
     }
   }
 
+  /// Removes the trigram entries for [text] associated with [key].
   void remove(String text, K key) {
     var grams = _generateTrigrams(text);
     for (var gram in grams) {
@@ -21,6 +30,7 @@ class FuzzyIndex<K> {
     }
   }
 
+  /// Returns the set of keys whose indexed text shares at least one trigram with [query].
   Set<K> getCandidates(String query) {
     var queryGrams = _generateTrigrams(query);
     if (queryGrams.isEmpty) return {};

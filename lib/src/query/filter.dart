@@ -1,23 +1,48 @@
+/// Represents a single filter condition for querying records.
 class Filter {
+  /// The name of the field to filter on.
   final String field;
 
+  /// Equality value filter.
   final dynamic eq;
+
+  /// Greater-than value filter.
   final dynamic gt;
+
+  /// Less-than value filter.
   final dynamic lt;
+
+  /// Greater-than-or-equal value filter.
   final dynamic gte;
+
+  /// Less-than-or-equal value filter.
   final dynamic lte;
 
+  /// Substring match filter.
   final String? contains;
+
+  /// Prefix match filter.
   final String? startsWith;
+
+  /// Suffix match filter.
   final String? endsWith;
 
+  /// List-of-values inclusion filter.
   final List? inValues;
+
+  /// Null check filter.
   final bool? isNull;
+
+  /// Lower bound of a range filter.
   final dynamic betweenStart;
+
+  /// Upper bound of a range filter.
   final dynamic betweenEnd;
 
-  // ✅ fuzzy search
+  /// Fuzzy search query string.
   final String? fuzzy;
+
+  /// Similarity threshold for fuzzy matching (0.0 to 1.0).
   final double? fuzzyThreshold;
 
   const Filter({
@@ -38,6 +63,7 @@ class Filter {
     this.fuzzyThreshold,
   });
 
+  /// Whether this filter is a simple equality check.
   bool get isEquality => eq != null;
 
   @override

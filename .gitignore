@@ -33,7 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
-# Symbolication related
+# Benchmark output
+benchmark_*.html
+benchmark_*.json
 app.*.symbols
 
 # Obfuscation related

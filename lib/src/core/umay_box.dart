@@ -19,9 +19,12 @@ import 'index_snapshot.dart';
 import 'record_codec.dart';
 import 'storage_file.dart';
 
+/// A persistent key-value box backed by an append-only log file with
+/// secondary indexes, reactive change streams, and automatic compaction.
 class UmayBox {
   static const int _snapshotWriteInterval = 100000;
 
+  /// The unique name of this box, used to derive file names on disk.
   final String name;
   final String _directory;
 
@@ -30,14 +33,17 @@ class UmayBox {
   late BoxIndex _index;
   late final File _snapshotFile;
 
+  /// Manages secondary, fuzzy, unique, and compound indexes for this box.
   final IndexManager indexManager = IndexManager();
   final CompactionPolicy _policy = CompactionPolicy();
   final ChangeBus _bus = ChangeBus();
 
   final AsyncLock _writeLock = AsyncLock();
 
+  /// Query engine for performing filtered, sorted, and paginated queries.
   late final QueryEngine queryEngine;
 
+  /// Holds relationship descriptors between this box and other boxes.
   final Map<String, dynamic> relations = {};
 
   bool _isOpen = false;
@@ -54,6 +60,10 @@ class UmayBox {
   // Open
   // =============================================================
 
+  /// Opens or creates a box with the given [name] in the optional [directory].
+  ///
+  /// Recovery is attempted first from the hint file, then the index snapshot,
+  /// and finally by full scan of the data file.
   static Future<UmayBox> open(String name, {String? directory}) async {
     final dir = directory ?? '.';
     final box = UmayBox._(name, dir);
@@ -96,6 +106,8 @@ class UmayBox {
     await _hintFile.open();
   }
 
+  /// Rebuilds all secondary, fuzzy, unique, and compound indexes by
+  /// re-reading every record from the data file.
   Future<void> rebuildIndexes() async {
     if (indexManager.secondaryIndexes.isEmpty &&
         indexManager.fuzzyIndexes.isEmpty &&
@@ -278,27 +290,19 @@ class UmayBox {
     return liveSize;
   }
 
-  Future<int> _oldRecordLength(String key, int? oldOffset) async {
-    final length = _recordLengths[key];
-    if (length != null) return length;
-    if (oldOffset == null) return 0;
-    return _readRecordLengthAt(oldOffset);
-  }
-
-  bool get _needsOldValueForPut =>
-      indexManager.hasIndexes || _bus.hasListeners;
-
   // =============================================================
   // GET
   //
-  // Read عملیات — lock لازم نداره چون:
-  //   1. StorageFile دو handle جدا داره (read/write)
-  //   2. Index فقط در write عوض میشه و atomic هست
-  //   3. File read از یه offset ثابت همیشه safe هست
+  // Read operations need no lock because:
+  //   1. StorageFile has separate read/write handles
+  //   2. Index is atomic and only changes during writes
+  //   3. File read at a fixed offset is always safe
   // =============================================================
 
+  /// Convenience alias for [get]. Provided for API compatibility.
   Future<dynamic> getSync(String key) => get(key);
 
+  /// Retrieves the value stored for [key], or `null` if not found.
   Future<dynamic> get(String key) async {
     _ensureOpen();
 
@@ -309,6 +313,9 @@ class UmayBox {
   }
 
 
+  /// Stores [value] under [key]. An optional [typeId] can be provided for
+  /// custom serialization; otherwise the type is inferred automatically.
+  /// Fires a change event and invalidates cached query results.
   Future<void> put(String key, Object value, [int? typeId]) async {
     _ensureOpen();
 
@@ -356,6 +363,8 @@ class UmayBox {
     });
   }
 
+  /// Stores multiple key-value pairs in a single atomic batch operation.
+  /// All entries are appended to the data file in one sequential write.
   Future<void> batchPut(List<MapEntry<String, Object>> entries) async {
     _ensureOpen();
 
@@ -433,6 +442,9 @@ class UmayBox {
   //
   // =============================================================
 
+  /// Deletes the entry for [key]. Performs a soft delete if the value
+  /// implements [SoftDelete] or contains a `deleted_at`/`deletedAt` field;
+  /// otherwise appends a tombstone record for physical deletion.
   Future<void> delete(String key) async {
     _ensureOpen();
 
@@ -467,6 +479,8 @@ class UmayBox {
     });
   }
 
+  /// Deletes multiple keys in a single atomic batch operation.
+  /// Soft-deletes eligible entries; tombstone records are written for others.
   Future<void> batchDelete(List<String> keys) async {
     _ensureOpen();
 
@@ -684,6 +698,8 @@ class UmayBox {
   // COMPACTION
   // =============================================================
 
+  /// Rewrites the data file, discarding stale records and tombstones to
+  /// reclaim space. The snapshot and hint files are also regenerated.
   Future<void> compact() async {
     _ensureOpen();
 
@@ -759,11 +775,14 @@ class UmayBox {
   // CLOSE
   // =============================================================
 
+  /// Persists the current in-memory index to the snapshot file (.idx).
   Future<void> saveSnapshot() async {
     await IndexSnapshot.save(_snapshotFile.path, _index.offsets);
     _snapshotDirty = false;
   }
 
+  /// Closes the box, cancels background compaction, saves a dirty snapshot,
+  /// and releases all file handles and resources.
   Future<void> close() async {
     _backgroundCompactionTimer?.cancel();
     _backgroundCompactionTimer = null;
@@ -799,13 +818,13 @@ class UmayBox {
     return map?[field];
   }
 
-  /// هر object رو به Map<String, dynamic> تبدیل می‌کنه.
+  /// Converts any object to `Map<String, dynamic>`.
   ///
-  /// ترتیب اولویت:
-  ///   1. اگه Map<String, dynamic> هست → مستقیم برگردون
-  ///   2. اگه Map (با key غیر String) هست → تبدیل کن
-  ///   3. اگه .toJson() داره → صدا بزن
-  ///   4. اگه .toMap() داره → صدا بزن
+  /// Priority order:
+  ///   1. If it's a `Map<String, dynamic>` → return directly
+  ///   2. If it's a `Map` (non-String keys) → convert
+  ///   3. If it has `.toJson()` → call it
+  ///   4. If it has `.toMap()` → call it
   ///   5. null
   Map<String, dynamic>? _asMap(dynamic obj) {
     if (obj == null) return null;

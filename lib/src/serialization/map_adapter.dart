@@ -2,10 +2,13 @@ import 'binary_reader.dart';
 import 'binary_writer.dart';
 import 'type_adapter.dart';
 
+/// A [TypeAdapter] for [Map<String, dynamic>] that serializes map
+/// entries (keys and values of primitive types) to and from binary.
 class MapAdapter extends TypeAdapter<Map<String, dynamic>> {
   @override
   int get typeId => 0;
 
+  /// Reads a map with string keys and dynamic values from the [reader].
   @override
   Map<String, dynamic> read(BinaryReader reader) {
     final length = reader.readInt();
@@ -18,6 +21,7 @@ class MapAdapter extends TypeAdapter<Map<String, dynamic>> {
     return map;
   }
 
+  /// Writes [obj] (a map with string keys) to the [writer] in binary format.
   @override
   void write(BinaryWriter writer, Map<String, dynamic> obj) {
     writer.writeInt(obj.length);

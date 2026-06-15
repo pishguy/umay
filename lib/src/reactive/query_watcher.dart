@@ -100,7 +100,8 @@ class SmartQueryWatcher<T> {
     final isMatching = newObj != null && _match(newObj);
 
     if (existed && !isMatching) {
-      final old = _itemsByKey[key]!;
+      final old = _itemsByKey[key];
+      if (old == null) return;
       _sorted.remove(old);
       _itemsByKey.remove(key);
       _emit();
@@ -108,16 +109,17 @@ class SmartQueryWatcher<T> {
     }
 
     if (!existed && isMatching) {
-      _itemsByKey[key] = newObj!;
+      _itemsByKey[key] = newObj;
       _sorted.add(newObj);
       _emit();
       return;
     }
 
     if (existed && isMatching) {
-      final old = _itemsByKey[key]!;
+      final old = _itemsByKey[key];
+      if (old == null) return;
       _sorted.remove(old);
-      _itemsByKey[key] = newObj!;
+      _itemsByKey[key] = newObj;
       _sorted.add(newObj);
       _emit();
     }

@@ -1,23 +1,27 @@
-import '../../umay_db.dart';
 import '../query/secondary_index.dart';
 import 'relation.dart';
 
+/// Defines a one-to-many relationship between two entity types.
 class HasMany<Parent, Related> extends Relation<Parent, Related> {
 
+  /// The foreign key field name on the related box.
   final String foreignKey;
+
+  /// A function that extracts the local key value from the parent.
   final dynamic Function(Parent) localKey;
 
   HasMany(
-      UmayBox parentBox,
-      UmayBox relatedBox,
+      super.parentBox,
+      super.relatedBox,
       this.foreignKey,
       this.localKey,
-      ) : super(parentBox, relatedBox);
+      );
 
   SecondaryIndex? _index() {
     return relatedBox.indexManager.secondaryIndexes[foreignKey];
   }
 
+  /// Loads the related records for a single parent entity.
   @override
   Future<List<Related>> loadOne(Parent parent) async {
 
@@ -59,6 +63,7 @@ class HasMany<Parent, Related> extends Relation<Parent, Related> {
     return results;
   }
 
+  /// Loads all related records for a list of parent entities.
   @override
   Future<List<Related>> loadMany(List<Parent> parents) async {
 

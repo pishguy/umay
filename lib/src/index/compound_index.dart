@@ -1,9 +1,16 @@
 import 'bplus_tree.dart';
 import 'composite_key.dart';
 
-///    to support duplicate composite keys
+/// A compound (composite) index over multiple fields using a B+ tree.
+///
+/// Supports exact-match lookup across all indexed fields, as well as
+/// range queries. Duplicate composite keys are handled by storing
+/// sets of record keys.
 class CompoundIndex {
+  /// The list of field names this compound index spans.
   final List<String> fields;
+
+  /// The underlying B+ tree mapping composite keys to sets of record keys.
   final BPlusTree<CompositeKey, Set<String>> tree;
 
   CompoundIndex(this.fields, {int order = 32})
@@ -22,6 +29,7 @@ class CompoundIndex {
     );
   }
 
+  /// Indexes [obj] under the composite key derived from its fields, associated with [key].
   void insert(Map<String, dynamic> obj, String key) {
     if (!_isValid(obj)) return;
     final composite = _buildKey(obj);
@@ -34,6 +42,7 @@ class CompoundIndex {
     }
   }
 
+  /// Removes the association of [key] from the composite key derived from [obj].
   void remove(Map<String, dynamic> obj, String key) {
     if (!_isValid(obj)) return;
     final composite = _buildKey(obj);
@@ -47,6 +56,9 @@ class CompoundIndex {
     }
   }
 
+  /// Searches for records whose fields exactly match [query].
+  ///
+  /// Returns the list of record keys that match, or an empty list if none found.
   List<String> search(Map<String, dynamic> query) {
     if (!_isValid(query)) return const [];
 
@@ -57,6 +69,9 @@ class CompoundIndex {
     return v.toList();
   }
 
+  /// Queries the range of composite keys between [start] (inclusive) and [end] (inclusive).
+  ///
+  /// Returns all record keys whose composite key falls within the range.
   List<String> range(
       Map<String, dynamic> start,
       Map<String, dynamic> end,

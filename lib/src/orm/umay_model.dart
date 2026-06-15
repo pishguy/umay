@@ -1,18 +1,20 @@
 import 'dart:convert';
 
 import '../../umay_db.dart';
-import '../query/engine/query_engine.dart';
 import '../query/query_builder.dart';
 import 'helpers.dart';
-import 'indexable.dart';
 import 'model_event_dispatcher.dart';
 
+/// Base ORM model with attribute management, dirty checking, serialization,
+/// and static query/find/create methods backed by [UmayBox].
 abstract class UmayModel {
+  /// The model's primary key value.
   dynamic id;
 
   static final Map<Type, UmayBox> _boxes = {};
   static final Map<Type, Function> _factories = {};
 
+  /// Global event dispatcher for model lifecycle events.
   static final ModelEventDispatcher events = ModelEventDispatcher();
 
   final Map<String, dynamic> _attributes = {};
@@ -21,25 +23,39 @@ abstract class UmayModel {
   final Map<String, dynamic> _relations = {};
   final Map<String, int> _counts = {};
 
+  /// Map of accessor names to their accessor functions.
+  /// Accessors transform attribute values on read.
   Map<String, dynamic Function(dynamic)> get accessors => {};
 
+  /// Map of mutator names to their mutator functions.
+  /// Mutators transform attribute values on write.
   Map<String, dynamic Function(dynamic)> get mutators => {};
 
+  /// Attribute keys to exclude from serialization.
   List<String> get hidden => [];
 
+  /// Whitelist of attribute keys to include in serialization.
+  /// If non-empty, only these keys are serialized.
   List<String> get visible => [];
 
+  /// Virtual attribute keys appended during serialization.
   List<String> get appends => [];
 
+  /// Attribute keys that are mass-assignable.
   List<String> get fillable => [];
 
+  /// Attribute keys that are guarded from mass-assignment.
+  /// Defaults to `['*']` which blocks all keys not in [fillable].
   List<String> get guarded => ['*'];
 
+  /// Attribute type cast map (e.g. `{'age': 'int'}`).
   Map<String, String> get casts => {};
 
   // -----------------------------------------------
   // Registration
   // -----------------------------------------------
+  /// Register a model type with a factory and a box.
+  /// If the model implements [IndexableModel] its indexes are created automatically.
   static void register<T extends UmayModel>(T Function() creator, {required UmayBox box}) {
     _factories[T] = creator;
     _boxes[T] = box;
@@ -57,12 +73,15 @@ abstract class UmayModel {
     }
   }
 
+  /// Create a model instance of [type] using the registered factory.
+  /// Returns `null` if [type] has not been registered.
   static UmayModel? createModel(Type type) {
     final factory = _factories[type];
     if (factory == null) return null;
     return factory();
   }
 
+  /// Create a model from a map of attributes, optionally setting its [id].
   static T fromMap<T extends UmayModel>(Map<String, dynamic> data, {dynamic id}) {
     final model = _createModel<T>();
     model.id = id;
@@ -95,6 +114,7 @@ abstract class UmayModel {
   // -----------------------------------------------
   // Accessors / Mutators / Casting
   // -----------------------------------------------
+  /// Get an attribute by [key], applying casts and accessors.
   dynamic getAttribute(String key) {
     var value = _attributes[key];
     value = _castAttribute(key, value);
@@ -105,6 +125,7 @@ abstract class UmayModel {
     return value;
   }
 
+  /// Set an attribute by [key], applying mutators and guarding checks.
   void setAttribute(String key, dynamic value) {
     if (!_isFillable(key)) return;
 
@@ -148,16 +169,19 @@ abstract class UmayModel {
   // -----------------------------------------------
   // Fill / Hydrate
   // -----------------------------------------------
+  /// Mass-assign attributes from [data], respecting fillable/guarded rules.
   void fill(Map<String, dynamic> data) {
     data.forEach((k, v) {
       if (_isFillable(k)) setAttribute(k, v);
     });
   }
 
+  /// Mass-assign attributes from [data] without respecting fillable/guarded rules.
   void forceFill(Map<String, dynamic> data) {
     _attributes.addAll(data);
   }
 
+  /// Replace all attributes with [data] and sync original values.
   void hydrate(Map<String, dynamic> data) {
     _attributes
       ..clear()
@@ -165,10 +189,12 @@ abstract class UmayModel {
     syncOriginal();
   }
 
+  /// Attach a related model (or list of models) under [name].
   void setRelation(String name, dynamic value) {
     _relations[name] = value;
   }
 
+  /// Retrieve a previously set relation by [name].
   dynamic getRelation(String name) => _relations[name];
 
   void setCount(String name, int count) {
@@ -180,6 +206,7 @@ abstract class UmayModel {
   // -----------------------------------------------
   // Serialization
   // -----------------------------------------------
+  /// Serialize the model to a map, respecting [hidden], [visible], and [appends].
   Map<String, dynamic> toMap() {
     final out = <String, dynamic>{};
 
@@ -203,16 +230,19 @@ abstract class UmayModel {
     return out;
   }
 
+  /// Alias for [toMap]; provided for JSON serialization consistency.
   Map<String, dynamic> toJson() => toMap();
 
   // -----------------------------------------------
   // Dirty Checking
   // -----------------------------------------------
+  /// Check whether the model (or a specific [key]) has unsaved changes.
   bool isDirty([String? key]) {
     if (key != null) return _attributes[key] != _original[key];
     return getDirty().isNotEmpty;
   }
 
+  /// Return a map of attributes whose values differ from their original state.
   Map<String, dynamic> getDirty() {
     final diff = <String, dynamic>{};
     _attributes.forEach((key, val) {
@@ -221,6 +251,7 @@ abstract class UmayModel {
     return diff;
   }
 
+  /// Reset the original attribute snapshot to the current attribute values.
   void syncOriginal() {
     _original
       ..clear()
@@ -230,6 +261,7 @@ abstract class UmayModel {
   // -----------------------------------------------
   // ORM API (Laravel-style)
   // -----------------------------------------------
+  /// Find a model of type [T] by its primary key. Returns `null` if not found.
   static Future<T?> find<T extends UmayModel>(dynamic id) async {
     final box = _boxFor<T>();
     final raw = await box.get(id.toString());
@@ -248,18 +280,21 @@ abstract class UmayModel {
     return model;
   }
 
+  /// Create a query for type [T] filtered by [field] == [value].
   static QueryBuilder<T> where<T extends UmayModel>(String field, dynamic value) {
     final box = _boxFor<T>();
     final engine = QueryEngine(box, box.indexManager);
     return QueryBuilder<T>(engine).where(field, eq: value);
   }
 
+  /// Start a fresh query builder for type [T].
   static QueryBuilder<T> query<T extends UmayModel>() {
     final box = _boxFor<T>();
     final engine = QueryEngine(box, box.indexManager);
     return QueryBuilder<T>(engine);
   }
 
+  /// Create and persist a new model of type [T] with the given [data].
   static Future<T> create<T extends UmayModel>(Map<String, dynamic> data) async {
     final box = _boxFor<T>();
     final model = _createModel<T>();
@@ -272,6 +307,7 @@ abstract class UmayModel {
     return model;
   }
 
+  /// Persist the current model state to the backing store.
   Future<void> save() async {
     final box = _boxes[runtimeType];
     if (box == null) {
@@ -286,6 +322,7 @@ abstract class UmayModel {
     syncOriginal();
   }
 
+  /// Delete the model from the backing store. Does nothing if [id] is null.
   Future<void> delete() async {
     if (id == null) return;
     final box = _boxes[runtimeType];
@@ -295,6 +332,7 @@ abstract class UmayModel {
 
   static int _idSeq = 0;
 
+  /// Generate a unique string ID based on microsecond timestamp and a sequence counter.
   static String generateId() {
     final ts = DateTime.now().microsecondsSinceEpoch;
     _idSeq++;

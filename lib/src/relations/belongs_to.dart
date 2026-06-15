@@ -1,16 +1,18 @@
-import '../../umay_db.dart';
 import 'relation.dart';
 
+/// Defines a belongs-to relationship where the parent holds a foreign key to the related entity.
 class BelongsTo<Parent, Related> extends Relation<Parent, Related> {
 
+  /// A function that extracts the foreign key value from the parent.
   final dynamic Function(Parent) foreignKey;
 
   BelongsTo(
-      UmayBox parentBox,
-      UmayBox relatedBox,
+      super.parentBox,
+      super.relatedBox,
       this.foreignKey,
-      ) : super(parentBox, relatedBox);
+      );
 
+  /// Loads all related records for a list of parent entities.
   @override
   Future<List<Related>> loadMany(List<Parent> parents) async {
 
@@ -33,6 +35,7 @@ class BelongsTo<Parent, Related> extends Relation<Parent, Related> {
     return results;
   }
 
+  /// Loads the related record for a single parent entity.
   @override
   Future<List<Related>> loadOne(Parent parent) async {
 

@@ -1,15 +1,11 @@
 import 'dart:async';
 
 import '../../../umay_db.dart';
-import '../../index/index_manager.dart';
-import '../../orm/soft_delete.dart';
-import '../../orm/umay_model.dart';
 import '../../reactive/query_watcher.dart';
 import '../../relations/relation_query.dart';
 import '../../relations/relation_resolver.dart';
 import '../../utils/levenshtein.dart';
 import '../../utils/text_normalizer.dart';
-import '../filter.dart';
 import '../pagination.dart';
 import '../query_optimizer.dart';
 import '../sort.dart';
@@ -18,8 +14,12 @@ import 'query_cache.dart';
 
 typedef _CompiledFilter = bool Function(Map<String, dynamic> row);
 
+/// Core query execution engine with caching, indexing, and filtering.
 class QueryEngine {
+  /// The UmayBox this engine queries against.
   final UmayBox box;
+
+  /// The index manager for fast lookups and fuzzy searches.
   final IndexManager indexManager;
 
   //instance-level cache
@@ -27,17 +27,20 @@ class QueryEngine {
 
   QueryEngine(this.box, this.indexManager);
 
+  /// Clears the query cache, forcing re-execution on next query.
   void invalidateAll() => _cache.clear();
 
   // -----------------------------------------------
   // ORM helpers
   // -----------------------------------------------
+  /// Finds and returns a single record by its ID, or `null` if not found.
   Future<T?> find<T>(dynamic id) async {
     final obj = await box.get(id.toString());
     if (obj == null) return null;
     return _toModel<T>(obj, id: id);
   }
 
+  /// Returns the first record matching the given filters, or `null` if none.
   Future<T?> first<T>({required List<Filter> filters}) async {
     final res = await execute<T>(
       filters: filters,
@@ -50,6 +53,7 @@ class QueryEngine {
     return res.isEmpty ? null : res.first;
   }
 
+  /// Returns all records matching the given filters with optional sorting and pagination.
   Future<List<T>> get<T>({
     required List<Filter> filters,
     String? sortField,
@@ -70,6 +74,7 @@ class QueryEngine {
     );
   }
 
+  /// Persists a model to the store.
   Future<void> save(dynamic model) async {
     final id = _extractId(model);
     if (id == null) throw StateError('Cannot save: no id');
@@ -77,16 +82,19 @@ class QueryEngine {
     invalidateAll();
   }
 
+  /// Deletes a record by ID.
   Future<void> delete(dynamic id) async {
     await box.delete(id.toString());
     invalidateAll();
   }
 
+  /// Alias for [delete].
   Future<void> destroy(dynamic id) => delete(id);
 
   // -----------------------------------------------
   // Main execute
   // -----------------------------------------------
+  /// Main execution method that compiles filters, applies indexes, and returns typed results.
   Future<List<T>> execute<T>({
     required List<Filter> filters,
     required bool includeDeleted,
@@ -513,6 +521,7 @@ class QueryEngine {
   // -----------------------------------------------
   // Watch
   // -----------------------------------------------
+  /// Returns a reactive stream of query results that updates automatically on data changes.
   Stream<List<T>> watch<T>({
     required List<Filter> filters,
     bool descending = false,

@@ -1,7 +1,4 @@
 import '../../umay_db.dart';
-import '../relations/belongs_to.dart';
-import '../relations/has_many.dart';
-import '../relations/has_one.dart';
 import '../relations/morph_to.dart';
 
 mixin UmayModelRelations<ParentType> {

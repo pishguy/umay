@@ -24,14 +24,22 @@
 //   هیچ کاری نمی‌کنن. تغییر اسم هیچ تأثیری روی عملکرد نداره.
 // =============================================================
 
+/// Annotation that marks a class as an Umay collection/entity.
 class UmayCollection {
+  /// Optional custom name for the collection. If null, the class name is used.
   final String? name;
   const UmayCollection([this.name]);
 }
 
+/// Annotation that marks a field for indexing or special handling.
 class UmayField {
+  /// Whether this field should be indexed for fast lookups.
   final bool index;
+
+  /// Whether this field should have a unique constraint.
   final bool unique;
+
+  /// Whether this field supports fuzzy text search.
   final bool fuzzy;
 
   const UmayField({
@@ -41,12 +49,14 @@ class UmayField {
   });
 }
 
-/// تا با کلاس runtime در src/relations/has_many.dart conflict نداشته باشه.
+/// Annotation for code generation of a one-to-many relationship.
 ///
-/// این annotation فقط برای code generator هست.
-/// در runtime از HasMany<Parent, Related> در src/relations/ استفاده کن.
+/// Use the runtime class `HasMany<Parent, Related>` from `src/relations/` for actual queries.
 class RelHasMany {
+  /// The type of the related model.
   final Type model;
+
+  /// The foreign key field name on the related box.
   final String foreignKey;
 
   const RelHasMany(
@@ -55,8 +65,12 @@ class RelHasMany {
       });
 }
 
+/// Annotation for code generation of a belongs-to relationship.
 class RelBelongsTo {
+  /// The type of the related model.
   final Type model;
+
+  /// The foreign key field name.
   final String foreignKey;
 
   const RelBelongsTo(
@@ -65,7 +79,7 @@ class RelBelongsTo {
       });
 }
 
-/// Annotation برای ManyToMany
+/// Annotation for code generation of a many-to-many relationship.
 class RelManyToMany {
   final Type model;
   final String pivotTable;

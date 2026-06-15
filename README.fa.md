@@ -55,7 +55,7 @@
 
 ```yaml
 dependencies:
-  umay_db: ^1.1.2
+  umay_db: ^1.2.0
 ```
 
 ### استفاده پایه

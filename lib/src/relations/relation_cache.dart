@@ -2,10 +2,6 @@ class RelationCache {
 
   final Map<String, Map<String, dynamic>> _cache = {};
 
-  String _key(String relation, String parentId) {
-    return "$relation::$parentId";
-  }
-
   dynamic get(String relation, String parentId) {
     final map = _cache[relation];
     if (map == null) return null;

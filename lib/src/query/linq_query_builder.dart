@@ -2,13 +2,19 @@ import '../../umay_db.dart';
 import '../relations/relation_loader.dart';
 import '../relations/relation_query.dart';
 import 'expressions.dart';
-import 'filter.dart';
-import 'proxy_builder.dart';
 
+/// A paginated result set containing a slice of data with page metadata.
 class PageResult<T> {
+  /// The list of items for the current page.
   final List<T> data;
+
+  /// The current page number (1-indexed).
   final int page;
+
+  /// The number of items per page.
   final int perPage;
+
+  /// The total number of items across all pages.
   final int total;
 
   PageResult({
@@ -18,10 +24,13 @@ class PageResult<T> {
     required this.total,
   });
 
+  /// The total number of pages computed from [total] and [perPage].
   int get lastPage => (total / perPage).ceil();
 }
 
+/// A fluent query builder for constructing and executing queries against an [UmayBox].
 class LinqQueryBuilder<T> {
+  /// The UmayBox instance this query operates on.
   final UmayBox box;
 
   Expr? _expr;
@@ -42,11 +51,13 @@ class LinqQueryBuilder<T> {
 
   // -------------------- SOFT DELETE --------------------
 
+  /// Includes soft-deleted records in the query results.
   LinqQueryBuilder<T> withTrashed() {
     _includeDeleted = true;
     return this;
   }
 
+  /// Limits results to only soft-deleted records.
   LinqQueryBuilder<T> onlyTrashed() {
     _onlyDeleted = true;
     return this;
@@ -54,14 +65,17 @@ class LinqQueryBuilder<T> {
 
   // -------------------- EAGER --------------------
 
+  /// Eagerly loads the specified relation.
   LinqQueryBuilder<T> withRelation(String relation) {
     eagerRelations.add(relation);
     return this;
   }
 
+  /// Alias for [withRelation].
   LinqQueryBuilder<T> include(String relation) =>
       withRelation(relation);
 
+  /// Eagerly loads the count of related records for the given relation name.
   LinqQueryBuilder<T> withCount(String relation) {
     withCountRelations[relation] = 1;
     return this;
@@ -69,6 +83,7 @@ class LinqQueryBuilder<T> {
 
   // -------------------- WHERE --------------------
 
+  /// Adds a filter condition to the query.
   LinqQueryBuilder<T> where(Expr Function(dynamic x) predicate) {
     final proxy = ProxyBuilder<T>().build();
     final expr = predicate(proxy);
@@ -82,8 +97,7 @@ class LinqQueryBuilder<T> {
     return this;
   }
 
-  //OR not truly supported in engine,
-  //         throw clear error instead of silent wrong results
+  /// Adds an OR filter condition (not supported; throws [UnsupportedError]).
   LinqQueryBuilder<T> orWhere(Expr Function(dynamic x) predicate) {
     throw UnsupportedError(
       'orWhere is not yet supported. '
@@ -91,6 +105,7 @@ class LinqQueryBuilder<T> {
     );
   }
 
+  /// Filters records where [field] is in the given list of values.
   LinqQueryBuilder<T> whereIn(String field, List values) {
     final expr = InExpr(field, values);
     _expr = _expr == null
@@ -99,6 +114,7 @@ class LinqQueryBuilder<T> {
     return this;
   }
 
+  /// Filters records where [field] is null.
   LinqQueryBuilder<T> whereNull(String field) {
     final expr = NullExpr(field);
     _expr = _expr == null
@@ -107,6 +123,7 @@ class LinqQueryBuilder<T> {
     return this;
   }
 
+  /// Filters records where [field] is between [a] and [b] (inclusive).
   LinqQueryBuilder<T> whereBetween(String field, dynamic a, dynamic b) {
     final expr = BetweenExpr(field, a, b);
     _expr = _expr == null
@@ -117,6 +134,7 @@ class LinqQueryBuilder<T> {
 
   // -------------------- ORDER --------------------
 
+  /// Sorts results in ascending order by the specified field.
   LinqQueryBuilder<T> orderBy(Expr Function(dynamic x) selector) {
     final proxy = ProxyBuilder<T>().build();
     final expr = selector(proxy);
@@ -131,6 +149,7 @@ class LinqQueryBuilder<T> {
     return this;
   }
 
+  /// Sorts results in descending order by the specified field.
   LinqQueryBuilder<T> orderByDesc(Expr Function(dynamic x) selector) {
     final proxy = ProxyBuilder<T>().build();
     final expr = selector(proxy);
@@ -147,11 +166,13 @@ class LinqQueryBuilder<T> {
 
   // -------------------- LIMIT --------------------
 
+  /// Limits the number of results returned.
   LinqQueryBuilder<T> limit(int n) {
     _limit = n;
     return this;
   }
 
+  /// Skips the specified number of results.
   LinqQueryBuilder<T> offset(int n) {
     _offset = n;
     return this;
@@ -159,6 +180,7 @@ class LinqQueryBuilder<T> {
 
   // -------------------- EXECUTE --------------------
 
+  /// Executes the query and returns the matching records.
   Future<List<T>> find() async {
     final filters = _convertExpr(_expr);
 
@@ -181,17 +203,20 @@ class LinqQueryBuilder<T> {
     return results;
   }
 
+  /// Executes the query and returns the first matching record, or `null` if none.
   Future<T?> first() async {
     _limit = 1;
     final r = await find();
     return r.isEmpty ? null : r.first;
   }
 
+  /// Executes the query and returns the number of matching records.
   Future<int> count() async {
     final r = await find();
     return r.length;
   }
 
+  /// Paginates the query results, returning a [PageResult] for the given page.
   Future<PageResult<T>> paginate(int page, int perPage) async {
     // Count without limit/offset
     final countBuilder = LinqQueryBuilder<T>(box);
@@ -214,6 +239,7 @@ class LinqQueryBuilder<T> {
 
   // -------------------- WATCH --------------------
 
+  /// Returns a broadcast stream that emits updated query results whenever data changes.
   Stream<List<T>> watch() {
     final filters = _convertExpr(_expr);
     return box.queryEngine.watch<T>(
